@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CCTV Finder</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- 카카오 앱 키: Kakao Developers(https://developers.kakao.com)에서 발급 후 아래 값을 교체하세요 -->
+  <script>window.KAKAO_APP_KEY = 'YOUR_KAKAO_APP_KEY_HERE';</script>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 10l4.553-2.069A1 1 0 0121 8.847v6.306a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+        </svg>
+        <h1>CCTV Finder</h1>
+      </div>
+      <div class="controls">
+        <label for="cctvCount">표시 개수</label>
+        <select id="cctvCount" class="count-select" aria-label="CCTV 표시 개수 선택">
+          <option value="8">8개</option>
+          <option value="12" selected>12개</option>
+          <option value="16">16개</option>
+          <option value="20">20개</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="search-section">
+      <div class="search-bar">
+        <div class="search-input-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input
+            type="text"
+            id="searchInput"
+            class="search-input"
+            placeholder="장소 또는 주소를 입력하세요..."
+            autocomplete="off"
+          >
+        </div>
+        <button id="searchBtn" class="search-btn" onclick="searchLocation()">검색</button>
+      </div>
+      <p class="search-hint">지도를 클릭하면 해당 위치 주변의 CCTV를 검색합니다</p>
+    </div>
+
+    <div class="map-section">
+      <div id="map" class="map" role="application" aria-label="카카오 지도"></div>
+      <div id="mapOverlay" class="map-overlay">
+        <div class="map-overlay-content">
+          <div class="spinner"></div>
+          <span>지도를 불러오는 중...</span>
+        </div>
+      </div>
+    </div>
+
+    <section class="cctv-section" aria-label="주변 CCTV 목록">
+      <div id="sectionHeader" class="section-header hidden">
+        <h2 class="section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 10l4.553-2.069A1 1 0 0121 8.847v6.306a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+          </svg>
+          주변 CCTV
+        </h2>
+        <span id="cctvCountBadge" class="count-badge"></span>
+        <span id="locationLabel" class="location-label"></span>
+      </div>
+
+      <div id="loadingSpinner" class="loading hidden" aria-live="polite">
+        <div class="spinner large"></div>
+        <p>CCTV 정보를 불러오는 중...</p>
+      </div>
+
+      <div id="errorMsg" class="error-msg hidden" aria-live="assertive">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span id="errorText"></span>
+      </div>
+
+      <div id="cctvGrid" class="cctv-grid"></div>
+
+      <div id="placeholder" class="placeholder" aria-label="안내">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="10" r="3"/>
+          <path d="M12 2a8 8 0 00-8 8c0 5.4 7 13 8 13s8-7.6 8-13a8 8 0 00-8-8z"/>
+        </svg>
+        <p>지도에서 위치를 클릭하면<br>주변 CCTV 목록이 표시됩니다</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>CCTV 데이터 제공: <a href="https://openapi.its.go.kr" target="_blank" rel="noopener noreferrer">국가교통정보센터 (ITS Korea)</a></p>
+    <p>지도: <a href="https://developers.kakao.com" target="_blank" rel="noopener noreferrer">Kakao Map</a></p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

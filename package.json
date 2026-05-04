@@ -1,0 +1,12 @@
+{
+  "name": "cctv-finder",
+  "version": "1.0.0",
+  "description": "카카오 지도 + ITS Open API 기반 위치별 CCTV 탐색기",
+  "type": "module",
+  "engines": {
+    "node": "20.x"
+  },
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}
