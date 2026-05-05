@@ -4,6 +4,7 @@
 let map = null;
 let clickMarker = null;
 let cctvMarkers = [];
+let currentCCTVList = [];
 let currentCount = 12;
 let lastLatLng = null;
 let isSearching = false;
@@ -186,8 +187,27 @@ async function updateSectionHeader(count, lat, lng) {
   }
 }
 
+// ── CCTV 선택 (카드 + 마커 동기화) ───────────────────────────────────────
+function selectCCTV(index) {
+  // 카드 강조
+  document.querySelectorAll('.cctv-card').forEach((c, i) => {
+    c.classList.toggle('active', i === index);
+  });
+
+  // 마커 색상 전환
+  cctvMarkers.forEach((m, i) => {
+    m.setIcon(createPinIcon(i === index));
+    m.setZIndexOffset(i === index ? 1000 : 0);
+  });
+
+  // 카드 스크롤
+  const card = document.querySelector(`.cctv-card[data-index="${index}"]`);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 // ── CCTV 카드 렌더링 ──────────────────────────────────────────────────────
 function renderCCTVs(list) {
+  currentCCTVList = list;
   const grid = document.getElementById('cctvGrid');
   grid.innerHTML = '';
 
@@ -248,8 +268,7 @@ function renderCCTVs(list) {
       if (!map) return;
       map.setView([parseFloat(cctv.coordy), parseFloat(cctv.coordx)], 16);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      document.querySelectorAll('.cctv-card').forEach(c => c.classList.remove('active'));
-      card.classList.add('active');
+      selectCCTV(i);
     };
     card.addEventListener('click', clickHandler);
     card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') clickHandler(); });
@@ -258,7 +277,17 @@ function renderCCTVs(list) {
   });
 }
 
-// ── 지도 위 CCTV 마커 ─────────────────────────────────────────────────────
+// ── 핀 아이콘 생성 ────────────────────────────────────────────────────────
+function createPinIcon(isActive) {
+  return L.divIcon({
+    className: '',
+    html: `<div class="cctv-pin${isActive ? ' active' : ''}"></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+}
+
+// ── 지도 위 CCTV 마커 (핀 + 이름 라벨) ───────────────────────────────────
 function renderMapMarkers(list) {
   cctvMarkers.forEach(m => map.removeLayer(m));
   cctvMarkers = [];
@@ -268,21 +297,20 @@ function renderMapMarkers(list) {
     const lng = parseFloat(cctv.coordx);
     if (isNaN(lat) || isNaN(lng)) return;
 
-    const icon = L.divIcon({
-      className: '',
-      html: `<div class="cctv-marker">#${i + 1} 📹</div>`,
-      iconAnchor: [24, 36],
+    const name = cctv.cctvname || `CCTV #${i + 1}`;
+    const marker = L.marker([lat, lng], { icon: createPinIcon(false) }).addTo(map);
+
+    // 이름 라벨을 항상 표시 (permanent tooltip)
+    marker.bindTooltip(name, {
+      permanent: true,
+      direction: 'top',
+      className: 'cctv-label',
+      offset: [0, -10],
     });
 
-    const marker = L.marker([lat, lng], { icon }).addTo(map);
-
     marker.on('click', () => {
-      const card = document.querySelector(`.cctv-card[data-index="${i}"]`);
-      if (card) {
-        document.querySelectorAll('.cctv-card').forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
+      map.setView([lat, lng], 16);
+      selectCCTV(i);
     });
 
     cctvMarkers.push(marker);
