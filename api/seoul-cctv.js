@@ -15,18 +15,40 @@ export default async function handler(req, res) {
   const maxY = parseFloat(lat) + d;
 
   try {
-    // 서울시 불법주정차/전용차로 위반 단속 CCTV 위치정보 (전체 통합)
-    const url = `http://openapi.seoul.go.kr:8088/${key}/json/TbOpendataFixedcctv/1/5/`;
-    const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    // Fetch all ~4652 records in parallel pages of 1000
+    const pageSize = 1000;
+    const pageCount = 5;
 
-    if (!response.ok) throw new Error(`Seoul API ${response.status}`);
+    const pages = Array.from({ length: pageCount }, (_, i) => {
+      const start = i * pageSize + 1;
+      const end = (i + 1) * pageSize;
+      const url = `http://openapi.seoul.go.kr:8088/${key}/json/TbOpendataFixedcctv/${start}/${end}/`;
+      return fetch(url, { signal: AbortSignal.timeout(8000) })
+        .then(r => r.json())
+        .catch(() => null);
+    });
 
-    const data = await response.json();
+    const results = await Promise.all(pages);
 
-    // DEBUG: return raw response structure
-    const topKeys = Object.keys(data);
-    const rawSample = JSON.stringify(data).slice(0, 800);
-    res.json({ debug: true, topKeys, rawSample, keyUsed: key.slice(0, 4) + '...' });
+    const allRows = results.flatMap(data => data?.TbOpendataFixedcctv?.row || []);
+
+    const filtered = allRows
+      .filter(row => {
+        const x = parseFloat(row.LOT);
+        const y = parseFloat(row.LAT);
+        return !isNaN(x) && !isNaN(y) && x >= minX && x <= maxX && y >= minY && y <= maxY;
+      })
+      .map(row => ({
+        cctvname: row.CRDN_BRNCH_NM || row.FIX_CCTV_ADDR,
+        coordx: row.LOT,
+        coordy: row.LAT,
+        cctvurl: '',
+        cctvtype: '4',
+        source: 'seoul',
+        addr: `${row.FIX_CCTV_ADDR} [${row.GRNDS_SE || '단속'}]`,
+      }));
+
+    res.json({ data: filtered, total: filtered.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
