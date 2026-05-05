@@ -85,7 +85,7 @@ document.getElementById('cctvCount').addEventListener('change', function () {
   if (lastLatLng) fetchCCTVs(lastLatLng.lat, lastLatLng.lng);
 });
 
-// ── CCTV 데이터 조회 ──────────────────────────────────────────────────────
+// ── CCTV 데이터 조회 (브라우저에서 ITS API 직접 호출) ────────────────────
 async function fetchCCTVs(lat, lng) {
   if (isSearching) return;
   isSearching = true;
@@ -99,15 +99,21 @@ async function fetchCCTVs(lat, lng) {
   setUIState('loading');
 
   try {
-    const res = await fetch(`/api/cctv?minX=${minX}&maxX=${maxX}&minY=${minY}&maxY=${maxY}`);
+    const apiKey = window.ITS_API_KEY || '';
+    const base = 'https://openapi.its.go.kr:9443/cctvInfo';
+    const params = `apiKey=${apiKey}&type=json&minX=${minX}&maxX=${maxX}&minY=${minY}&maxY=${maxY}&getType=json`;
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `서버 오류 (${res.status})`);
-    }
+    // 국가도로(1), 지방도(2), 도시부도로(3) 동시 조회
+    const results = await Promise.allSettled(
+      [1, 2, 3].map(cctvType =>
+        fetch(`${base}?${params}&cctvType=${cctvType}`)
+          .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
+      )
+    );
 
-    const data = await res.json();
-    const list = data?.response?.data || data?.data || [];
+    const list = results.flatMap(r =>
+      r.status === 'fulfilled' ? (r.value?.response?.data ?? r.value?.data ?? []) : []
+    );
 
     const sorted = list
       .filter(c => c.coordx && c.coordy)
