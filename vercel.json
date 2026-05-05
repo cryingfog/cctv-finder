@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "api/cctv.js": {
+      "regions": ["icn1"]
+    },
+    "api/test.js": {
+      "regions": ["icn1"]
+    }
+  }
+}
