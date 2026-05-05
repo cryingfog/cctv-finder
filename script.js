@@ -233,10 +233,10 @@ function renderCCTVs(list) {
           <span class="card-type type-${cctv.cctvtype || '1'}">${typeLabel}</span>
         </div>
         ${hasStream
-          ? `<a href="${cctv.cctvurl}" target="_blank" rel="noopener noreferrer" class="card-btn" onclick="event.stopPropagation()">
+          ? `<button class="card-btn" onclick="event.stopPropagation(); openStream(this, '${cctv.cctvurl}')">
                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                스트리밍 보기
-             </a>`
+             </button>`
           : `<span class="card-btn disabled">
                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6"/></svg>
                스트리밍 없음
@@ -301,6 +301,65 @@ function haversine(lat1, lng1, lat2, lng2) {
 
 function formatDist(km) {
   return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
+}
+
+// ── 스트리밍 인라인 재생 ──────────────────────────────────────────────────
+function openStream(btn, url) {
+  const card = btn.closest('.cctv-card');
+  const preview = card.querySelector('.card-preview');
+
+  // 버튼 상태 변경
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner" style="width:16px;height:16px;border-width:2px;margin:0"></div> 로딩 중...`;
+
+  const video = document.createElement('video');
+  video.controls = true;
+  video.autoplay = true;
+  video.muted = true;
+  video.playsInline = true;
+  video.style.cssText = 'width:100%;height:100%;object-fit:cover;background:#000;display:block;';
+
+  const onError = () => {
+    preview.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;color:#94a3b8;font-size:0.8rem;padding:12px;text-align:center;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        브라우저에서 재생할 수 없습니다
+      </div>`;
+    btn.disabled = false;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polygon points="5 3 19 12 5 21 5 3"/></svg> 스트리밍 보기`;
+  };
+
+  // HLS(m3u8) 스트림 처리
+  if (url.includes('.m3u8') || url.includes('m3u8')) {
+    if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+      const hls = new Hls({ enableWorker: false });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.ERROR, (_, data) => { if (data.fatal) onError(); });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
+      video.addEventListener('error', onError);
+    } else {
+      onError(); return;
+    }
+  } else {
+    video.src = url;
+    video.addEventListener('error', onError);
+  }
+
+  video.addEventListener('playing', () => {
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> 재생 중`;
+  });
+
+  // 카드 넘버 유지, 나머지 교체
+  const numBadge = preview.querySelector('.card-number');
+  const streamBadge = preview.querySelector('.card-stream-badge');
+  preview.innerHTML = '';
+  if (numBadge) preview.appendChild(numBadge);
+  if (streamBadge) preview.appendChild(streamBadge);
+  preview.appendChild(video);
 }
 
 // ── 시작 ──────────────────────────────────────────────────────────────────
