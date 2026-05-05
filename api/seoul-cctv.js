@@ -44,7 +44,8 @@ export default async function handler(req, res) {
         return !isNaN(x) && !isNaN(y) && x >= minX && x <= maxX && y >= minY && y <= maxY;
       });
 
-    res.json({ data: filtered, total: rows.length });
+    const rawKeys = rows[0] ? Object.keys(rows[0]) : [];
+    res.json({ data: filtered, total: rows.length, rawKeys, keyUsed: key.slice(0, 4) + '...' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
