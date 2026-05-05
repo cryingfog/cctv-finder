@@ -3,69 +3,48 @@
 // ── State ──────────────────────────────────────────────────────────────────
 let map = null;
 let clickMarker = null;
-let cctvOverlays = [];
+let cctvMarkers = [];
 let currentCount = 12;
 let lastLatLng = null;
 let isSearching = false;
 
-// ── Kakao Map 동적 로드 ────────────────────────────────────────────────────
-(function loadKakaoSDK() {
-  if (!window.KAKAO_APP_KEY || window.KAKAO_APP_KEY === 'YOUR_KAKAO_APP_KEY_HERE') {
-    showMapError('카카오 지도 API 키가 설정되지 않았습니다.<br>index.html의 KAKAO_APP_KEY 값을 교체해 주세요.');
-    return;
-  }
-  const s = document.createElement('script');
-  s.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${window.KAKAO_APP_KEY}&libraries=services&autoload=false`;
-  s.onload = () => kakao.maps.load(initMap);
-  s.onerror = () => showMapError('카카오 지도 SDK를 불러오지 못했습니다. API 키를 확인해 주세요.');
-  document.head.appendChild(s);
-})();
-
-function showMapError(msg) {
-  const overlay = document.getElementById('mapOverlay');
-  if (overlay) {
-    overlay.innerHTML = `<div class="map-overlay-content" style="color:#f87171;text-align:center;padding:20px;line-height:1.7">${msg}</div>`;
-  }
-}
-
-// ── 지도 초기화 ────────────────────────────────────────────────────────────
+// ── 지도 초기화 (Leaflet + OpenStreetMap) ─────────────────────────────────
 function initMap() {
-  const container = document.getElementById('map');
-  map = new kakao.maps.Map(container, {
-    center: new kakao.maps.LatLng(37.5665, 126.9780),
-    level: 7,
+  map = L.map('map', {
+    center: [37.5665, 126.9780],
+    zoom: 12,
+    zoomControl: true,
   });
 
-  // 지도 로드 완료 → 오버레이 제거
-  document.getElementById('mapOverlay').classList.add('hidden');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  }).addTo(map);
 
-  // 지도 클릭 이벤트
-  kakao.maps.event.addListener(map, 'click', function (e) {
-    const latlng = e.latLng;
-    placeClickMarker(latlng);
-    lastLatLng = latlng;
-    fetchCCTVs(latlng.getLat(), latlng.getLng());
+  map.on('click', function (e) {
+    const { lat, lng } = e.latlng;
+    placeClickMarker(lat, lng);
+    lastLatLng = { lat, lng };
+    fetchCCTVs(lat, lng);
   });
 }
 
 // ── 클릭 마커 ─────────────────────────────────────────────────────────────
-function placeClickMarker(latlng) {
-  if (clickMarker) clickMarker.setMap(null);
+function placeClickMarker(lat, lng) {
+  if (clickMarker) map.removeLayer(clickMarker);
 
-  const imgSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png';
-  const imgSize = new kakao.maps.Size(24, 35);
-  const markerImage = new kakao.maps.MarkerImage(imgSrc, imgSize);
-
-  clickMarker = new kakao.maps.Marker({
-    position: latlng,
-    image: markerImage,
-    map,
-    zIndex: 10,
-  });
+  clickMarker = L.marker([lat, lng], {
+    icon: L.divIcon({
+      className: '',
+      html: '<div class="click-marker">📍</div>',
+      iconAnchor: [14, 28],
+    }),
+    zIndexOffset: 1000,
+  }).addTo(map);
 }
 
-// ── 주소 검색 ─────────────────────────────────────────────────────────────
-function searchLocation() {
+// ── 주소 검색 (Nominatim - 무료, API 키 불필요) ───────────────────────────
+async function searchLocation() {
   const keyword = document.getElementById('searchInput').value.trim();
   if (!keyword || !map) return;
 
@@ -73,34 +52,26 @@ function searchLocation() {
   btn.textContent = '검색 중...';
   btn.disabled = true;
 
-  const geocoder = new kakao.maps.services.Geocoder();
-  geocoder.addressSearch(keyword, function (result, status) {
-    if (status === kakao.maps.services.Status.OK) {
-      moveTo(result[0].y, result[0].x, 6);
-      resetBtn();
-    } else {
-      const ps = new kakao.maps.services.Places();
-      ps.keywordSearch(keyword, function (data, status2) {
-        resetBtn();
-        if (status2 === kakao.maps.services.Status.OK) {
-          moveTo(data[0].y, data[0].x, 6);
-        } else {
-          alert(`"${keyword}" 검색 결과를 찾을 수 없습니다.`);
-        }
-      });
-    }
-  });
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(keyword)}&format=json&limit=1&accept-language=ko&countrycodes=kr`,
+      { headers: { 'Accept-Language': 'ko' } }
+    );
+    const data = await res.json();
 
-  function resetBtn() {
+    if (data.length > 0) {
+      const lat = parseFloat(data[0].lat);
+      const lng = parseFloat(data[0].lon);
+      map.setView([lat, lng], 14);
+    } else {
+      alert(`"${keyword}" 검색 결과를 찾을 수 없습니다.`);
+    }
+  } catch {
+    alert('검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+  } finally {
     btn.textContent = '검색';
     btn.disabled = false;
   }
-}
-
-function moveTo(lat, lng, level) {
-  const coords = new kakao.maps.LatLng(lat, lng);
-  map.setCenter(coords);
-  map.setLevel(level);
 }
 
 // ── 엔터키 검색 ───────────────────────────────────────────────────────────
@@ -111,9 +82,7 @@ document.getElementById('searchInput').addEventListener('keydown', function (e) 
 // ── CCTV 개수 변경 ────────────────────────────────────────────────────────
 document.getElementById('cctvCount').addEventListener('change', function () {
   currentCount = parseInt(this.value, 10);
-  if (lastLatLng) {
-    fetchCCTVs(lastLatLng.getLat(), lastLatLng.getLng());
-  }
+  if (lastLatLng) fetchCCTVs(lastLatLng.lat, lastLatLng.lng);
 });
 
 // ── CCTV 데이터 조회 ──────────────────────────────────────────────────────
@@ -121,7 +90,7 @@ async function fetchCCTVs(lat, lng) {
   if (isSearching) return;
   isSearching = true;
 
-  const delta = 0.12; // 약 12~13km 반경
+  const delta = 0.12;
   const minX = (lng - delta).toFixed(6);
   const maxX = (lng + delta).toFixed(6);
   const minY = (lat - delta).toFixed(6);
@@ -130,9 +99,7 @@ async function fetchCCTVs(lat, lng) {
   setUIState('loading');
 
   try {
-    const res = await fetch(
-      `/api/cctv?minX=${minX}&maxX=${maxX}&minY=${minY}&maxY=${maxY}`
-    );
+    const res = await fetch(`/api/cctv?minX=${minX}&maxX=${maxX}&minY=${minY}&maxY=${maxY}`);
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -142,7 +109,6 @@ async function fetchCCTVs(lat, lng) {
     const data = await res.json();
     const list = data?.response?.data || data?.data || [];
 
-    // 거리 계산 후 정렬
     const sorted = list
       .filter(c => c.coordx && c.coordy)
       .map(c => ({
@@ -152,12 +118,11 @@ async function fetchCCTVs(lat, lng) {
       .sort((a, b) => a.distance - b.distance)
       .slice(0, currentCount);
 
-    renderCCTVs(sorted, lat, lng);
+    renderCCTVs(sorted);
     renderMapMarkers(sorted);
     updateSectionHeader(sorted.length, lat, lng);
     setUIState('results');
 
-    // 결과 영역으로 부드럽게 스크롤
     document.querySelector('.cctv-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (err) {
     console.error('[CCTV Fetch]', err);
@@ -197,24 +162,26 @@ function showError(msg) {
   document.getElementById('errorText').textContent = msg;
 }
 
-// ── 섹션 헤더 업데이트 ────────────────────────────────────────────────────
-function updateSectionHeader(count, lat, lng) {
+// ── 섹션 헤더 업데이트 (역지오코딩 - Nominatim) ───────────────────────────
+async function updateSectionHeader(count, lat, lng) {
   document.getElementById('cctvCountBadge').textContent = `${count}개`;
 
-  const geocoder = new kakao.maps.services.Geocoder();
-  geocoder.coord2Address(lng, lat, function (result, status) {
-    const label = document.getElementById('locationLabel');
-    if (status === kakao.maps.services.Status.OK && result[0]) {
-      const addr = result[0].road_address?.address_name || result[0].address?.address_name || '';
-      label.textContent = addr ? `📍 ${addr}` : '';
-    } else {
-      label.textContent = `📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    }
-  });
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ko`
+    );
+    const data = await res.json();
+    const addr = data?.address
+      ? [data.address.city || data.address.county, data.address.suburb || data.address.neighbourhood, data.address.road].filter(Boolean).join(' ')
+      : '';
+    document.getElementById('locationLabel').textContent = addr ? `📍 ${addr}` : `📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  } catch {
+    document.getElementById('locationLabel').textContent = `📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }
 }
 
 // ── CCTV 카드 렌더링 ──────────────────────────────────────────────────────
-function renderCCTVs(list, clickLat, clickLng) {
+function renderCCTVs(list) {
   const grid = document.getElementById('cctvGrid');
   grid.innerHTML = '';
 
@@ -239,7 +206,6 @@ function renderCCTVs(list, clickLat, clickLng) {
     card.dataset.index = i;
     card.setAttribute('role', 'button');
     card.setAttribute('tabindex', '0');
-    card.setAttribute('aria-label', `${cctv.cctvname || '이름 없음'}, ${dist} 거리`);
 
     card.innerHTML = `
       <div class="card-preview">
@@ -262,34 +228,23 @@ function renderCCTVs(list, clickLat, clickLng) {
         </div>
         ${hasStream
           ? `<a href="${cctv.cctvurl}" target="_blank" rel="noopener noreferrer" class="card-btn" onclick="event.stopPropagation()">
-               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                 <polygon points="5 3 19 12 5 21 5 3"/>
-               </svg>
+               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                스트리밍 보기
              </a>`
           : `<span class="card-btn disabled">
-               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                 <line x1="1" y1="1" x2="23" y2="23"/>
-                 <path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23"/>
-               </svg>
+               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6"/></svg>
                스트리밍 없음
              </span>`
         }
       </div>`;
 
-    // 카드 클릭 → 지도 해당 위치로 이동
     const clickHandler = () => {
       if (!map) return;
-      const pos = new kakao.maps.LatLng(parseFloat(cctv.coordy), parseFloat(cctv.coordx));
-      map.setCenter(pos);
-      map.setLevel(5);
+      map.setView([parseFloat(cctv.coordy), parseFloat(cctv.coordx)], 16);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-
-      // 활성 카드 강조
       document.querySelectorAll('.cctv-card').forEach(c => c.classList.remove('active'));
       card.classList.add('active');
     };
-
     card.addEventListener('click', clickHandler);
     card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') clickHandler(); });
 
@@ -299,32 +254,23 @@ function renderCCTVs(list, clickLat, clickLng) {
 
 // ── 지도 위 CCTV 마커 ─────────────────────────────────────────────────────
 function renderMapMarkers(list) {
-  cctvOverlays.forEach(o => o.setMap(null));
-  cctvOverlays = [];
+  cctvMarkers.forEach(m => map.removeLayer(m));
+  cctvMarkers = [];
 
   list.forEach((cctv, i) => {
     const lat = parseFloat(cctv.coordy);
     const lng = parseFloat(cctv.coordx);
     if (isNaN(lat) || isNaN(lng)) return;
 
-    const content = `
-      <div style="
-        background:#2563eb;color:#fff;padding:4px 9px;border-radius:6px;
-        font-size:11px;font-weight:700;white-space:nowrap;
-        box-shadow:0 2px 8px rgba(0,0,0,0.5);cursor:pointer;
-        border:1px solid rgba(255,255,255,0.2);
-      ">#${i + 1} 📹</div>`;
-
-    const overlay = new kakao.maps.CustomOverlay({
-      position: new kakao.maps.LatLng(lat, lng),
-      content,
-      map,
-      yAnchor: 1.3,
-      zIndex: 5,
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="cctv-marker">#${i + 1} 📹</div>`,
+      iconAnchor: [24, 36],
     });
 
-    // 마커 클릭 → 카드 강조
-    overlay.getContent().addEventListener?.('click', () => {
+    const marker = L.marker([lat, lng], { icon }).addTo(map);
+
+    marker.on('click', () => {
       const card = document.querySelector(`.cctv-card[data-index="${i}"]`);
       if (card) {
         document.querySelectorAll('.cctv-card').forEach(c => c.classList.remove('active'));
@@ -333,7 +279,7 @@ function renderMapMarkers(list) {
       }
     });
 
-    cctvOverlays.push(overlay);
+    cctvMarkers.push(marker);
   });
 }
 
@@ -343,12 +289,13 @@ function haversine(lat1, lng1, lat2, lng2) {
   const toRad = d => (d * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function formatDist(km) {
   return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
 }
+
+// ── 시작 ──────────────────────────────────────────────────────────────────
+initMap();
