@@ -15,7 +15,8 @@ export default async function handler(req, res) {
   const maxY = parseFloat(lat) + d;
 
   try {
-    const url = `http://openapi.seoul.go.kr:8088/${key}/json/GetCCTVInfo/1/1000/`;
+    // 서울시 불법주정차/전용차로 위반 단속 CCTV 위치정보 (전체 통합)
+    const url = `http://openapi.seoul.go.kr:8088/${key}/json/TbOpendataFixedcctv/1/5/`;
     const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
 
     if (!response.ok) throw new Error(`Seoul API ${response.status}`);
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
 
     // DEBUG: return raw response structure
     const topKeys = Object.keys(data);
-    const rawSample = JSON.stringify(data).slice(0, 500);
+    const rawSample = JSON.stringify(data).slice(0, 800);
     res.json({ debug: true, topKeys, rawSample, keyUsed: key.slice(0, 4) + '...' });
   } catch (err) {
     res.status(500).json({ error: err.message });
