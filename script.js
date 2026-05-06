@@ -106,7 +106,7 @@ async function fetchCCTVs(lat, lng) {
     const params = `apiKey=${apiKey}&type=json&minX=${minX}&maxX=${maxX}&minY=${minY}&maxY=${maxY}&getType=json`;
 
     const itsPromise = Promise.allSettled(
-      [1, 2, 3].map(cctvType =>
+      [1, 2, 3, 4].map(cctvType =>
         fetch(`${base}?${params}&cctvType=${cctvType}`)
           .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
       )
@@ -226,7 +226,7 @@ function renderCCTVs(list) {
     return;
   }
 
-  const typeLabels = { '1': '국가도로', '2': '지방도', '3': '도시부도로', '4': '서울시도로' };
+  const typeLabels = { '1': '고속도로', '2': '국도', '3': '지방도', '4': '도시부도로' };
 
   list.forEach((cctv, i) => {
     const dist = formatDist(cctv.distance);
