@@ -26,11 +26,7 @@ export default async function handler(req, res) {
 
     if (!response.ok) throw new Error(`UTIC API ${response.status}`);
 
-    // DEBUG: check outbound IP
-    const ipRes = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(5000) });
-    const ipData = await ipRes.json();
     const data = await response.json();
-    return res.json({ _debug: true, outboundIp: ipData.ip, uticSample: Array.isArray(data) ? data[0] : data });
 
     // UTIC returns array or object with items; normalize to array
     const raw = Array.isArray(data) ? data : (data?.data ?? data?.response?.data ?? []);
