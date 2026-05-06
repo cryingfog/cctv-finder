@@ -11,7 +11,10 @@ export default async function handler(req, res) {
   const key = process.env.UTIC_API_KEY;
   const endpoint = process.env.UTIC_API_ENDPOINT;
 
-  if (!key) return res.status(500).json({ error: 'UTIC_API_KEY not set' });
+  if (!key) {
+    const uticVars = Object.keys(process.env).filter(k => k.includes('UTIC') || k.includes('utic'));
+    return res.status(500).json({ error: 'UTIC_API_KEY not set', hint: uticVars });
+  }
   if (!endpoint) return res.status(500).json({ error: 'UTIC_API_ENDPOINT not set' });
   if (!lat || !lng) return res.status(400).json({ error: 'lat and lng are required' });
 
