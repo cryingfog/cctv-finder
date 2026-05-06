@@ -112,9 +112,8 @@ async function fetchCCTVs(lat, lng) {
       )
     );
 
-    // Seoul Open API — 단속 CCTV는 반경을 좁게 (ITS 교통 CCTV에 밀리지 않도록)
-    const seoulDelta = 0.05;
-    const seoulPromise = fetch(`/api/seoul-cctv?lat=${lat}&lng=${lng}&delta=${seoulDelta}`)
+    // Seoul Open API — Vercel 프록시 경유
+    const seoulPromise = fetch(`/api/seoul-cctv?lat=${lat}&lng=${lng}&delta=${delta}`)
       .then(r => r.json())
       .catch(() => ({ data: [] }));
 
@@ -134,10 +133,18 @@ async function fetchCCTVs(lat, lng) {
         distance: haversine(lat, lng, parseFloat(c.coordy), parseFloat(c.coordx)),
       }));
 
-    // 스트리밍 있는 CCTV 우선, 각 그룹 내에서는 거리순
+    // 스트리밍·비스트리밍 각각 거리순 정렬 후 절반씩 할당
+    // 한 쪽이 부족하면 다른 쪽으로 채움
     const streaming = withDist.filter(c => c.cctvurl).sort((a, b) => a.distance - b.distance);
     const noStream  = withDist.filter(c => !c.cctvurl).sort((a, b) => a.distance - b.distance);
-    const sorted = [...streaming, ...noStream].slice(0, currentCount);
+    const half = Math.ceil(currentCount / 2);
+    const streamCount    = Math.min(streaming.length, half);
+    const noStreamCount  = Math.min(noStream.length, currentCount - streamCount);
+    const extraStream    = currentCount - streamCount - noStreamCount;
+    const sorted = [
+      ...streaming.slice(0, streamCount + extraStream),
+      ...noStream.slice(0, noStreamCount),
+    ].slice(0, currentCount);
 
     renderCCTVs(sorted);
     renderMapMarkers(sorted);
