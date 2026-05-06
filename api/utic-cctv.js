@@ -31,20 +31,8 @@ export default async function handler(req, res) {
     if (!response.ok) throw new Error(`UTIC API ${response.status}`);
 
     const data = await response.json();
-    const list = data?.response?.data ?? data?.data ?? [];
-
-    const result = list
-      .filter(c => c.coordx && c.coordy && c.cctvurl)
-      .map(c => ({
-        cctvname: c.cctvname,
-        coordx: c.coordx,
-        coordy: c.coordy,
-        cctvurl: c.cctvurl,
-        cctvtype: 'utic',
-        source: 'utic',
-      }));
-
-    res.json({ data: result, total: result.length });
+    // DEBUG: return raw response to inspect structure
+    return res.json({ _debug: true, raw: data });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
