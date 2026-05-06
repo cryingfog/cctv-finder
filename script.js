@@ -114,9 +114,16 @@ async function fetchCCTVs(lat, lng) {
 
     const itsResults = await itsPromise;
 
-    const combined = itsResults.flatMap(r =>
-      r.status === 'fulfilled' ? (r.value?.response?.data ?? r.value?.data ?? []) : []
-    );
+    // 동일 스트림 URL로 중복 제거 (같은 카메라가 여러 cctvType으로 반환됨)
+    const seen = new Set();
+    const combined = itsResults
+      .flatMap(r => r.status === 'fulfilled' ? (r.value?.response?.data ?? r.value?.data ?? []) : [])
+      .filter(c => {
+        if (!c.cctvurl) return false;
+        if (seen.has(c.cctvurl)) return false;
+        seen.add(c.cctvurl);
+        return true;
+      });
 
     const withDist = combined
       .filter(c => c.coordx && c.coordy)
@@ -125,9 +132,7 @@ async function fetchCCTVs(lat, lng) {
         distance: haversine(lat, lng, parseFloat(c.coordy), parseFloat(c.coordx)),
       }));
 
-    // 스트리밍 있는 CCTV만 표시, 거리순 정렬
     const sorted = withDist
-      .filter(c => c.cctvurl)
       .sort((a, b) => a.distance - b.distance)
       .slice(0, currentCount);
 
