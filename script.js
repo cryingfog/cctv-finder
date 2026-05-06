@@ -112,19 +112,11 @@ async function fetchCCTVs(lat, lng) {
       )
     );
 
-    // Seoul Open API — Vercel 프록시 경유
-    const seoulPromise = fetch(`/api/seoul-cctv?lat=${lat}&lng=${lng}&delta=${delta}`)
-      .then(r => r.json())
-      .catch(() => ({ data: [] }));
+    const itsResults = await itsPromise;
 
-    const [itsResults, seoulRes] = await Promise.all([itsPromise, seoulPromise]);
-
-    const itsList = itsResults.flatMap(r =>
+    const combined = itsResults.flatMap(r =>
       r.status === 'fulfilled' ? (r.value?.response?.data ?? r.value?.data ?? []) : []
     );
-    const seoulList = seoulRes?.data || [];
-
-    const combined = [...itsList, ...seoulList];
 
     const withDist = combined
       .filter(c => c.coordx && c.coordy)
