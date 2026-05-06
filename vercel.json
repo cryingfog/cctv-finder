@@ -5,6 +5,9 @@
     },
     "api/seoul-cctv.js": {
       "regions": ["icn1"]
+    },
+    "api/utic-cctv.js": {
+      "regions": ["icn1"]
     }
   }
 }
