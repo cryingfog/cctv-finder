@@ -86,7 +86,7 @@ document.getElementById('cctvCount').addEventListener('change', function () {
   if (lastLatLng) fetchCCTVs(lastLatLng.lat, lastLatLng.lng);
 });
 
-// ── CCTV 데이터 조회 (ITS 직접 + Seoul 프록시 병렬) ─────────────────────
+// ── CCTV 데이터 조회 (ITS Korea API) ────────────────────────────────────
 async function fetchCCTVs(lat, lng) {
   if (isSearching) return;
   isSearching = true;
@@ -105,25 +105,17 @@ async function fetchCCTVs(lat, lng) {
     const base = 'https://openapi.its.go.kr:9443/cctvInfo';
     const params = `apiKey=${apiKey}&type=json&minX=${minX}&maxX=${maxX}&minY=${minY}&maxY=${maxY}&getType=json`;
 
-    const itsPromise = Promise.allSettled(
+    const itsResults = await Promise.allSettled(
       [1, 2, 3, 4].map(cctvType =>
         fetch(`${base}?${params}&cctvType=${cctvType}`)
           .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
       )
     );
 
-    // UTIC 경찰청 도심 교차로 CCTV — Vercel 프록시 경유
-    const uticPromise = fetch(`/api/utic-cctv?lat=${lat}&lng=${lng}&delta=${delta}`)
-      .then(r => r.json())
-      .catch(() => ({ data: [] }));
-
-    const [itsResults, uticRes] = await Promise.all([itsPromise, uticPromise]);
-
     // 동일 스트림 URL로 중복 제거 (같은 카메라가 여러 cctvType으로 반환됨)
     const seen = new Set();
     const combined = [
       ...itsResults.flatMap(r => r.status === 'fulfilled' ? (r.value?.response?.data ?? r.value?.data ?? []) : []),
-      ...(uticRes?.data || []),
     ].filter(c => {
       if (!c.cctvurl) return false;
       if (seen.has(c.cctvurl)) return false;
@@ -237,7 +229,7 @@ function renderCCTVs(list) {
     return;
   }
 
-  const typeLabels = { '1': '고속도로', '2': '국도', '3': '지방도', '4': '도시부도로', 'utic': '도심교차로' };
+  const typeLabels = { '1': '고속도로', '2': '국도', '3': '지방도', '4': '도시부도로' };
 
   list.forEach((cctv, i) => {
     const dist = formatDist(cctv.distance);
@@ -267,7 +259,7 @@ function renderCCTVs(list) {
             </svg>
             ${dist}
           </span>
-          <span class="card-type ${cctv.source === 'utic' ? 'type-utic' : `type-${cctv.cctvtype || '1'}`}">${typeLabel}</span>
+          <span class="card-type type-${cctv.cctvtype || '1'}">${typeLabel}</span>
         </div>
         ${hasStream
           ? `<button class="card-btn" onclick="event.stopPropagation(); openStream(this, '${cctv.cctvurl}')">

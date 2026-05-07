@@ -24,9 +24,9 @@ export default async function handler(req, res) {
   const BASE = 'https://openapi.its.go.kr:9443/cctvInfo';
   const commonParams = `apiKey=${apiKey}&type=json&minX=${minX}&maxX=${maxX}&minY=${minY}&maxY=${maxY}&getType=json`;
 
-  // 세 가지 도로 유형 병렬 조회 (1=국가도로, 2=지방도, 3=도시부도로)
+  // 네 가지 도로 유형 병렬 조회 (1=고속도로, 2=국도, 3=지방도, 4=도시부도로)
   const results = await Promise.allSettled(
-    [1, 2, 3].map(cctvType =>
+    [1, 2, 3, 4].map(cctvType =>
       fetch(`${BASE}?${commonParams}&cctvType=${cctvType}`, {
         signal: AbortSignal.timeout(8000),
       }).then(r => {
