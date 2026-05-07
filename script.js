@@ -112,14 +112,16 @@ async function fetchCCTVs(lat, lng) {
       )
     );
 
-    // 동일 스트림 URL로 중복 제거 (같은 카메라가 여러 cctvType으로 반환됨)
+    // 중복 제거: 같은 카메라가 cctvType 1~4 모두에서 반환됨
+    // URL이 타입마다 달라질 수 있으므로 이름+좌표 기준으로 중복 제거
     const seen = new Set();
     const combined = [
       ...itsResults.flatMap(r => r.status === 'fulfilled' ? (r.value?.response?.data ?? r.value?.data ?? []) : []),
     ].filter(c => {
       if (!c.cctvurl) return false;
-      if (seen.has(c.cctvurl)) return false;
-      seen.add(c.cctvurl);
+      const key = `${c.cctvname}|${c.coordx}|${c.coordy}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
 
